@@ -27,6 +27,8 @@ dict_labels = {
 LABEL_NAMES = list(dict_labels.keys())
 MODEL_NAME = 'bert-base-multilingual-cased'
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
+DATA_COLLATOR = DataCollatorForTokenClassification(TOKENIZER)
+METRIC = load_metric("seqeval")
 
 
 def read_tsv_files(tsv_files=['en-small_corpora_train.tsv']):
@@ -209,6 +211,44 @@ def preprocess_dataset(tsv_files=['en-small_corpora_train.tsv']):
     print(d1)
     d2 = d1.map(tokenize_adjust_labels, batched=True)
     return d2
+
+
+def compute_metrics(p):
+    """Calculate metrics for val dataset
+
+    Args:
+        p (tuple): prediction
+
+    Returns:
+        dict: metrics result
+    """
+    predictions, labels = p
+    predictions = np.argmax(predictions, axis=2)
+
+    # Remove ignored index (special tokens)
+    true_predictions = [
+        [LABEL_NAMES[p] for (p, l) in zip(pred, label) if l != -100]
+        for pred, label in zip(predictions, labels)
+    ]
+    true_labels = [
+        [LABEL_NAMES[l] for (p, l) in zip(pred, label) if l != -100]
+        for pred, label in zip(predictions, labels)
+    ]
+
+    results = METRIC.compute(
+        predictions=true_predictions, references=true_labels)
+
+    flattened_results = {
+        "overall_precision": results["overall_precision"],
+        "overall_recall": results["overall_recall"],
+        "overall_f1": results["overall_f1"],
+        "overall_accuracy": results["overall_accuracy"],
+    }
+    for k in results.keys():
+        if (k not in flattened_results.keys()):
+            flattened_results[k + "_f1"] = results[k]["f1"]
+
+    return flattened_results
 
 
 if __name__ == '__main__':
