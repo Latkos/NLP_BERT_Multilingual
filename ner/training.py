@@ -24,7 +24,9 @@ dict_labels = {
     "B-ENTITIY_2": 3,
     "I-ENTITIY_2": 4
 }
-label_names = list(dict_labels.keys())
+LABEL_NAMES = list(dict_labels.keys())
+MODEL_NAME = 'bert-base-multilingual-cased'
+TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 
 def read_tsv_files(tsv_files=['en-small_corpora_train.tsv']):
@@ -128,8 +130,68 @@ def add_tokens_ner_tags(data_frame):
     return data_frame
 
 
+def create_dataset(data_frame):
+    """Convert tokens and ner_tags columns from data frame to Dataset.
+
+    Args:
+        data_frame (pandas.DataFrame):
+
+    Returns:
+        Dataset: Dataset object
+    """
+
+    new_data_frame = data_frame[['tokens', 'ner_tags']]
+    return Dataset.from_pandas(new_data_frame)
+
+
+def tokenize_adjust_labels(all_samples_per_split):
+    """
+    Adjust labes. For each sample, we need to get the values for input_ids,
+    token_type_ids and attention_mask as well as adjust the labels.
+
+    Args:
+        all_samples_per_split (Dataset.row): Dataset row
+
+    Returns:
+        Dataset: Dataset with  tokenized samples.
+    """
+    tokenized_samples = TOKENIZER.batch_encode_plus(
+        all_samples_per_split["tokens"], is_split_into_words=True)
+    # tokenized_samples is not a datasets object so
+    # this alone won't work with Trainer API, hence map is used
+    # so the new keys [input_ids, labels (after adjustment)]
+    # can be added to the datasets dict for each train test validation split
+    total_adjusted_labels = []
+    print(len(tokenized_samples["input_ids"]))
+    for k in range(0, len(tokenized_samples["input_ids"])):
+        prev_wid = -1
+        word_ids_list = tokenized_samples.word_ids(batch_index=k)
+        existing_label_ids = all_samples_per_split["ner_tags"][k]
+        i = -1
+        adjusted_label_ids = []
+
+        for wid in word_ids_list:
+            if (wid is None):
+                adjusted_label_ids.append(-100)
+            elif (wid != prev_wid):
+                i = i + 1
+                adjusted_label_ids.append(existing_label_ids[i])
+                prev_wid = wid
+            else:
+                label_name = LABEL_NAMES[existing_label_ids[i]]
+                adjusted_label_ids.append(existing_label_ids[i])
+
+        total_adjusted_labels.append(adjusted_label_ids)
+    tokenized_samples["labels"] = total_adjusted_labels
+    return tokenized_samples
+
+
 if __name__ == '__main__':
     a = read_tsv_files(tsv_files=['en-small_corpora_train.tsv'])
     print(a.head())
     a2 = add_tokens_ner_tags(a)
     print(a2.head())
+    d1 = create_dataset(a2)
+    print(d1)
+    t1 = d1.map(tokenize_adjust_labels, batched=True)
+    print(t1)
