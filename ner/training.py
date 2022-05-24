@@ -153,7 +153,7 @@ def tokenize_adjust_labels(all_samples_per_split):
         all_samples_per_split (Dataset.row): Dataset row
 
     Returns:
-        Dataset: Dataset with  tokenized samples.
+        Dataset: Dataset with tokenized samples.
     """
     tokenized_samples = TOKENIZER.batch_encode_plus(
         all_samples_per_split["tokens"], is_split_into_words=True)
@@ -186,12 +186,31 @@ def tokenize_adjust_labels(all_samples_per_split):
     return tokenized_samples
 
 
-if __name__ == '__main__':
-    a = read_tsv_files(tsv_files=['en-small_corpora_train.tsv'])
-    print(a.head())
-    a2 = add_tokens_ner_tags(a)
-    print(a2.head())
-    d1 = create_dataset(a2)
+def preprocess_dataset(tsv_files=['en-small_corpora_train.tsv']):
+    """
+    Preprocess the Dataset.
+    1. Read all data frames,
+    2. Add tokens nad ner tags
+    3. Convert to dataset
+    4. Tokenize and adjust labels
+    5. return dataset used for training or test model
+
+    Args:
+        tsv_files (list): list of tsv files
+
+    Returns:
+        Dataset: Dataset with tokenized samples.
+    """
+    df1 = read_tsv_files(tsv_files=['en-small_corpora_train.tsv'])
+    print(df1.head())
+    df2 = add_tokens_ner_tags(df1)
+    print(df2.head())
+    d1 = create_dataset(df2)
     print(d1)
-    t1 = d1.map(tokenize_adjust_labels, batched=True)
-    print(t1)
+    d2 = d1.map(tokenize_adjust_labels, batched=True)
+    return d2
+
+
+if __name__ == '__main__':
+    a = preprocess_dataset(tsv_files=['en-small_corpora_train.tsv'])
+    print(a)
