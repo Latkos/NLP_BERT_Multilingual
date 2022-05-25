@@ -1,5 +1,4 @@
 import os
-from unicodedata import name
 
 import pandas as pd
 import numpy as np
@@ -8,12 +7,11 @@ import nltk
 from datasets import Dataset, load_metric
 from transformers import (
     AutoTokenizer,
-    AutoModelForTokenClassification,
+    BertForTokenClassification,
     TrainingArguments,
     Trainer,
     DataCollatorForTokenClassification
 )
-import torch
 
 
 nltk.download('punkt')
@@ -29,9 +27,19 @@ MODEL_NAME = 'bert-base-multilingual-cased'
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
 DATA_COLLATOR = DataCollatorForTokenClassification(TOKENIZER)
 METRIC = load_metric("seqeval")
+TRAIN_CONFIG = dict(
+        output_dir="./training_output/m-bert_my_ner_de_en_corpora_output",
+        evaluation_strategy="steps",
+        learning_rate=2e-5,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
+        num_train_epochs=6,
+        weight_decay=1e-3,
+        logging_steps=800,
+)
 
 
-def read_tsv_files(tsv_files=['en-small_corpora_train.tsv']):
+def read_tsv_files(tsv_files=['./data/en-small_corpora_train.tsv']):
     """Read the list of tsv files, merge it and shuffle the rows
 
     Args:
@@ -188,11 +196,11 @@ def tokenize_adjust_labels(all_samples_per_split):
     return tokenized_samples
 
 
-def preprocess_dataset(tsv_files=['en-small_corpora_train.tsv']):
+def preprocess_dataset(tsv_files=['./data/en-small_corpora_train.tsv']):
     """
     Preprocess the Dataset.
     1. Read all data frames,
-    2. Add tokens nad ner tags
+    2. Add tokens and ner tags
     3. Convert to dataset
     4. Tokenize and adjust labels
     5. return dataset used for training or test model
@@ -203,7 +211,7 @@ def preprocess_dataset(tsv_files=['en-small_corpora_train.tsv']):
     Returns:
         Dataset: Dataset with tokenized samples.
     """
-    df1 = read_tsv_files(tsv_files=['en-small_corpora_train.tsv'])
+    df1 = read_tsv_files(tsv_files=tsv_files)
     print(df1.head())
     df2 = add_tokens_ner_tags(df1)
     print(df2.head())
@@ -251,6 +259,60 @@ def compute_metrics(p):
     return flattened_results
 
 
+def create_trainer(train_datset, test_dataset,
+                   training_arguments=TRAIN_CONFIG):
+    model = BertForTokenClassification.from_pretrained(
+        MODEL_NAME, num_labels=len(LABEL_NAMES))
+    data_collator = DataCollatorForTokenClassification(TOKENIZER)
+    training_arguments = TrainingArguments(
+        output_dir=training_arguments.get('output_dir'),
+        evaluation_strategy=training_arguments.get('evaluation_strategy'),
+        learning_rate=training_arguments.get('learning_rate'),
+        per_device_train_batch_size=training_arguments.get(
+            'per_device_train_batch_size'),
+        per_device_eval_batch_size=training_arguments.get(
+            'per_device_eval_batch_size'),
+        num_train_epochs=training_arguments.get(
+            'num_train_epochs'),
+        weight_decay=training_arguments.get(
+            'weight_decay'),
+        logging_steps=training_arguments.get(
+            'logging_steps'),
+    )
+
+    trainer = Trainer(
+        model,
+        training_arguments,
+        train_dataset=train_datset,
+        eval_dataset=test_dataset,
+        data_collator=data_collator,
+        tokenizer=TOKENIZER,
+        compute_metrics=compute_metrics
+    )
+    return trainer
+
+
+def train_model(train_tsv_files=['./data/en-small_corpora_train.tsv'],
+                test_tsv_files=['./data/en-small_corpora_test.tsv'],
+                training_arguments=TRAIN_CONFIG,
+                model_output_name='m-bert_ner_en.model'):
+    print("Start training")
+    train_dataset = preprocess_dataset(tsv_files=train_tsv_files)
+    print("Created training dataset")
+    test_dataset = preprocess_dataset(tsv_files=test_tsv_files)
+    print("Created test dataset")
+    trainer = create_trainer(
+        train_datset=train_dataset,
+        test_dataset=test_dataset,
+        training_arguments=training_arguments
+        )
+    print("Run train")
+    trainer.train()
+    print("Run evaluate")
+    trainer.evaluate()
+    print("Save model")
+    trainer.save_model('./models/'+model_output_name)
+
+
 if __name__ == '__main__':
-    a = preprocess_dataset(tsv_files=['en-small_corpora_train.tsv'])
-    print(a)
+    train_model()
