@@ -1,5 +1,3 @@
-import os
-
 import pandas as pd
 import numpy as np
 
@@ -25,7 +23,6 @@ dict_labels = {
 LABEL_NAMES = list(dict_labels.keys())
 MODEL_NAME = 'bert-base-multilingual-cased'
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
-DATA_COLLATOR = DataCollatorForTokenClassification(TOKENIZER)
 METRIC = load_metric("seqeval")
 TRAIN_CONFIG = dict(
         output_dir="./training_output/m-bert_my_ner_de_en_corpora_output",
@@ -36,24 +33,23 @@ TRAIN_CONFIG = dict(
         num_train_epochs=6,
         weight_decay=1e-3,
         logging_steps=800,
+        train_val_split=0.2
 )
 
 
-def read_tsv_files(tsv_files=['./data/en-small_corpora_train.tsv']):
-    """Read the list of tsv files, merge it and shuffle the rows
+def read_tsv_file(tsv_file='./data/en-small_corpora_train.tsv'):
+    """
+    Read tsv file, shuffle the rows.
 
     Args:
-        tsv_files (list): list of tsv files
+        tsv_file (String): list of tsv file or tsv file
 
     Returns:
         pandas.DataFrame: Merged and Shuffled Data frame
     """
 
-    df_list = list()
-    for tsv_file in tsv_files:
-        df_list.append(pd.read_csv(tsv_file, sep='\t', header=0))
-    df_all = pd.concat(df_list).reset_index()
-    df_ranodmize_rows = df_all.sample(frac=1)
+    df = pd.read_csv(tsv_file, sep='\t', header=0)
+    df_ranodmize_rows = df.sample(frac=1)
     return df_ranodmize_rows
 
 
@@ -172,7 +168,6 @@ def tokenize_adjust_labels(all_samples_per_split):
     # so the new keys [input_ids, labels (after adjustment)]
     # can be added to the datasets dict for each train test validation split
     total_adjusted_labels = []
-    print(len(tokenized_samples["input_ids"]))
     for k in range(0, len(tokenized_samples["input_ids"])):
         prev_wid = -1
         word_ids_list = tokenized_samples.word_ids(batch_index=k)
@@ -196,29 +191,34 @@ def tokenize_adjust_labels(all_samples_per_split):
     return tokenized_samples
 
 
-def preprocess_dataset(tsv_files=['./data/en-small_corpora_train.tsv']):
+def preprocess_dataset(tsv_file='./data/en-small_corpora_train.tsv',
+                       split=None):
     """
     Preprocess the Dataset.
     1. Read all data frames,
     2. Add tokens and ner tags
     3. Convert to dataset
     4. Tokenize and adjust labels
+    5. Split dataset for training and validation if split is not none. 
     5. return dataset used for training or test model
 
     Args:
-        tsv_files (list): list of tsv files
-
+        tsv_file (string): tsv file
+        split (float): split dataset (train and val)
     Returns:
         Dataset: Dataset with tokenized samples.
     """
-    df1 = read_tsv_files(tsv_files=tsv_files)
-    print(df1.head())
+    df1 = read_tsv_file(tsv_file=tsv_file)
     df2 = add_tokens_ner_tags(df1)
-    print(df2.head())
     d1 = create_dataset(df2)
-    print(d1)
     d2 = d1.map(tokenize_adjust_labels, batched=True)
-    return d2
+    if split is None:
+        return d2
+    else:
+        d3 = d2.train_test_split(split)
+        train = d3['train']
+        val = d3['test']
+        return train, val
 
 
 def compute_metrics(p):
@@ -259,12 +259,12 @@ def compute_metrics(p):
     return flattened_results
 
 
-def create_trainer(train_datset, test_dataset,
-                   training_arguments=TRAIN_CONFIG):
+def create_trainer(train_datset, val_dataset,
+                   training_arguments):
     model = BertForTokenClassification.from_pretrained(
         MODEL_NAME, num_labels=len(LABEL_NAMES))
     data_collator = DataCollatorForTokenClassification(TOKENIZER)
-    training_arguments = TrainingArguments(
+    args = TrainingArguments(
         output_dir=training_arguments.get('output_dir'),
         evaluation_strategy=training_arguments.get('evaluation_strategy'),
         learning_rate=training_arguments.get('learning_rate'),
@@ -282,9 +282,9 @@ def create_trainer(train_datset, test_dataset,
 
     trainer = Trainer(
         model,
-        training_arguments,
+        args,
         train_dataset=train_datset,
-        eval_dataset=test_dataset,
+        eval_dataset=val_dataset,
         data_collator=data_collator,
         tokenizer=TOKENIZER,
         compute_metrics=compute_metrics
@@ -292,26 +292,24 @@ def create_trainer(train_datset, test_dataset,
     return trainer
 
 
-def train_model(train_tsv_files=['./data/en-small_corpora_train.tsv'],
-                test_tsv_files=['./data/en-small_corpora_test.tsv'],
+def train_model(train_tsv_file='./data/en-small_corpora_train.tsv',
+                test_tsv_file='./data/en-small_corpora_test.tsv',
+                model_output='./models/ner/m-bert_ner_en.model',
                 training_arguments=TRAIN_CONFIG,
-                model_output_name='m-bert_ner_en.model'):
-    print("Start training")
-    train_dataset = preprocess_dataset(tsv_files=train_tsv_files)
-    print("Created training dataset")
-    test_dataset = preprocess_dataset(tsv_files=test_tsv_files)
-    print("Created test dataset")
+                ):
+    train_dataset, val_dataset = preprocess_dataset(
+        tsv_file=train_tsv_file, split=training_arguments.get(
+            'train_val_split'))
+    test_dataset = preprocess_dataset(tsv_file=test_tsv_file)
     trainer = create_trainer(
         train_datset=train_dataset,
-        test_dataset=test_dataset,
+        val_dataset=val_dataset,
         training_arguments=training_arguments
-        )
-    print("Run train")
+    )
     trainer.train()
-    print("Run evaluate")
-    trainer.evaluate()
-    print("Save model")
-    trainer.save_model('./models/'+model_output_name)
+    result = trainer.evaluate(test_dataset)
+    print("EVALUATE: ", result)
+    trainer.save_model(model_output)
 
 
 if __name__ == '__main__':
