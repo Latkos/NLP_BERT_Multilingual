@@ -35,6 +35,7 @@ TRAIN_CONFIG = dict(
         logging_steps=800,
         train_val_split=0.2
 )
+MODEL_SAVE_PATH = './models/ner/'
 
 
 def read_tsv_file(tsv_file='./data/en-small_corpora_train.tsv'):
@@ -294,7 +295,7 @@ def create_trainer(train_datset, val_dataset,
 
 def train_model(train_tsv_file='./data/en-small_corpora_train.tsv',
                 test_tsv_file='./data/en-small_corpora_test.tsv',
-                model_output='./models/ner/m-bert_ner_en.model',
+                model_name='m-bert_ner_en.model',
                 training_arguments=TRAIN_CONFIG,
                 ):
     train_dataset, val_dataset = preprocess_dataset(
@@ -309,7 +310,7 @@ def train_model(train_tsv_file='./data/en-small_corpora_train.tsv',
     trainer.train()
     result = trainer.evaluate(test_dataset)
     print("EVALUATE: ", result)
-    trainer.save_model(model_output)
+    trainer.save_model(MODEL_SAVE_PATH + model_name)
 
 
 if __name__ == '__main__':
