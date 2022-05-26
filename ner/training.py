@@ -24,17 +24,7 @@ LABEL_NAMES = list(dict_labels.keys())
 MODEL_NAME = 'bert-base-multilingual-cased'
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
 METRIC = load_metric("seqeval")
-TRAIN_CONFIG = dict(
-        output_dir="./training_output/m-bert_my_ner_de_en_corpora_output",
-        evaluation_strategy="steps",
-        learning_rate=2e-5,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
-        num_train_epochs=6,
-        weight_decay=1e-3,
-        logging_steps=800,
-        train_val_split=0.2
-)
+
 MODEL_SAVE_PATH = './models/ner/'
 
 
@@ -43,10 +33,10 @@ def read_tsv_file(tsv_file='./data/en-small_corpora_train.tsv'):
     Read tsv file, shuffle the rows.
 
     Args:
-        tsv_file (String): list of tsv file or tsv file
+        tsv_file (String): Tsv file
 
     Returns:
-        pandas.DataFrame: Merged and Shuffled Data frame
+        pandas.DataFrame: Shuffled Data frame
     """
 
     df = pd.read_csv(tsv_file, sep='\t', header=0)
@@ -293,11 +283,19 @@ def create_trainer(train_datset, val_dataset,
     return trainer
 
 
-def train_model(train_tsv_file='./data/en-small_corpora_train.tsv',
-                test_tsv_file='./data/en-small_corpora_test.tsv',
-                model_name='m-bert_ner_en.model',
-                training_arguments=TRAIN_CONFIG,
-                ):
+def train_model(train_tsv_file, test_tsv_file,
+                model_name, training_arguments):
+    """Training ner model
+
+    Args:
+        train_tsv_file (str): Training tsv file
+        test_tsv_file (str, optional): Test tsv file
+        model_name (str, optional): Model name
+        training_arguments (dict): Training arguments
+
+    Returns:
+        dic: Test result
+    """
     train_dataset, val_dataset = preprocess_dataset(
         tsv_file=train_tsv_file, split=training_arguments.get(
             'train_val_split'))
@@ -311,6 +309,7 @@ def train_model(train_tsv_file='./data/en-small_corpora_train.tsv',
     result = trainer.evaluate(test_dataset)
     print("EVALUATE: ", result)
     trainer.save_model(MODEL_SAVE_PATH + model_name)
+    return result
 
 
 if __name__ == '__main__':

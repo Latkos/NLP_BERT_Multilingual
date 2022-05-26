@@ -1,7 +1,7 @@
 import click
 
 from ner import training as ner_training
-from config_parser import get_config
+from config_parser import get_ner_training_args
 # import pandas as pd
 
 # from relations_model import train_model, evaluate_model
@@ -10,8 +10,13 @@ from config_parser import get_config
 @click.group()
 def bert_cli():
     """
-        Command Line Interpreter for multilingual m-bert model
-        for named entity recognition (NER) and relations extraction (RE)
+Command Line Interpreter for multilingual m-bert model\
+for named entity recognition (NER) and relations extraction (RE)
+
+Example:
+
+- python main_in_works.py train ./data/en-small_corpora_train.tsv ./data/en-small_corpora_test.tsv \
+--config ./config/base_config.yaml --model_name en-small_corpora 
     """
     pass
 
@@ -27,14 +32,11 @@ short_help="Train M-BERT model")
 @click.argument('train_file', nargs=1, required=True, type=str)
 @click.argument('test_file', nargs=1, required=True, type=str)
 def train(train_file, test_file, config, model_name):
-    config_file = get_config(config)
-    ner_training.train_model(
+    args = get_ner_training_args(config)
+    ner_test_result = ner_training.train_model(
         train_tsv_file=train_file, test_tsv_file=test_file,
-        model_name=model_name, training_arguments=config_file['train']['ner'])
-    print(train_file)
-    print(test_file)
-    print(config)
-    print(model_name)
+        model_name=model_name, training_arguments=args)
+    print(f"Test result after training: {ner_test_result}")
 
 # def main():
 #     # TODO loading and parsing arguments, remove hardcoding
