@@ -15,16 +15,17 @@ for named entity recognition (NER) and relations extraction (RE)
 
 Example:
 
-- python main_in_works.py train ./data/en-small_corpora_train.tsv ./data/en-small_corpora_test.tsv \
---config ./config/base_config.yaml --model_name en-small_corpora 
+- python main_in_works.py train ./data/en-small_corpora_train.tsv \
+./data/en-small_corpora_test.tsv --config ./config/base_config.yaml \
+--model_name en-small_corpora
     """
     pass
 
 
 @bert_cli.command(
-help="""Train M-BERT model for named entity recognition (NER) and
+    help="""Train M-BERT model for named entity recognition (NER) and
 relations extraction (RE) with train file test file and config file""",
-short_help="Train M-BERT model")
+    short_help="Train M-BERT model")
 @click.option('--config', default='./config/train.cfg',
               type=str, help='path to train config')
 @click.option('--model_name', default="en-small-corpora",
