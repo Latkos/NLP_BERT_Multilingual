@@ -2,50 +2,28 @@ import pandas as pd
 import numpy as np
 
 import nltk
-from datasets import Dataset, load_metric
+from datasets import Dataset
 from transformers import (
-    AutoTokenizer,
     BertForTokenClassification,
     TrainingArguments,
     Trainer,
-    DataCollatorForTokenClassification
 )
+
+from ner.ner_config import NERConfig
 
 
 nltk.download('punkt')
-dict_labels = {
-    'O': 0,
-    "B-ENTITIY_1": 1,
-    "I-ENTITIY_1": 2,
-    "B-ENTITIY_2": 3,
-    "I-ENTITIY_2": 4
-}
-LABEL_NAMES = list(dict_labels.keys())
-MODEL_NAME = 'bert-base-multilingual-cased'
-TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
-METRIC = load_metric("seqeval")
-TRAIN_CONFIG = dict(
-        output_dir="./training_output/m-bert_my_ner_de_en_corpora_output",
-        evaluation_strategy="steps",
-        learning_rate=2e-5,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
-        num_train_epochs=6,
-        weight_decay=1e-3,
-        logging_steps=800,
-        train_val_split=0.2
-)
 
 
-def read_tsv_file(tsv_file='./data/en-small_corpora_train.tsv'):
+def read_tsv_file(tsv_file):
     """
     Read tsv file, shuffle the rows.
 
     Args:
-        tsv_file (String): list of tsv file or tsv file
+        tsv_file (String): Tsv file
 
     Returns:
-        pandas.DataFrame: Merged and Shuffled Data frame
+        pandas.DataFrame: Shuffled Data frame
     """
 
     df = pd.read_csv(tsv_file, sep='\t', header=0)
@@ -105,17 +83,22 @@ def create_ner_tags(raw_text):
             elif token == 'StopEnity2':
                 flag = 0
         elif flag == 0:
-            ner_tags_list.append(dict_labels.get('O'))
+            ner_tags_list.append(
+                NERConfig.DICT_LABELS.get('O'))
         elif flag == 1:
-            ner_tags_list.append(dict_labels.get("B-ENTITIY_1"))
+            ner_tags_list.append(
+                NERConfig.DICT_LABELS.get("B-ENTITIY_1"))
             flag = 2
         elif flag == 2:
-            ner_tags_list.append(dict_labels.get("I-ENTITIY_1"))
+            ner_tags_list.append(
+                NERConfig.DICT_LABELS.get("I-ENTITIY_1"))
         elif flag == 3:
-            ner_tags_list.append(dict_labels.get("B-ENTITIY_2"))
+            ner_tags_list.append(
+                NERConfig.DICT_LABELS.get("B-ENTITIY_2"))
             flag = 4
         elif flag == 4:
-            ner_tags_list.append(dict_labels.get("I-ENTITIY_2"))
+            ner_tags_list.append(
+                NERConfig.DICT_LABELS.get("I-ENTITIY_2"))
 
     return ner_tags_list
 
@@ -161,7 +144,7 @@ def tokenize_adjust_labels(all_samples_per_split):
     Returns:
         Dataset: Dataset with tokenized samples.
     """
-    tokenized_samples = TOKENIZER.batch_encode_plus(
+    tokenized_samples = NERConfig.TOKENIZER.batch_encode_plus(
         all_samples_per_split["tokens"], is_split_into_words=True)
     # tokenized_samples is not a datasets object so
     # this alone won't work with Trainer API, hence map is used
@@ -183,7 +166,7 @@ def tokenize_adjust_labels(all_samples_per_split):
                 adjusted_label_ids.append(existing_label_ids[i])
                 prev_wid = wid
             else:
-                label_name = LABEL_NAMES[existing_label_ids[i]]
+                label_name = NERConfig.LABEL_NAMES[existing_label_ids[i]]
                 adjusted_label_ids.append(existing_label_ids[i])
 
         total_adjusted_labels.append(adjusted_label_ids)
@@ -191,8 +174,7 @@ def tokenize_adjust_labels(all_samples_per_split):
     return tokenized_samples
 
 
-def preprocess_dataset(tsv_file='./data/en-small_corpora_train.tsv',
-                       split=None):
+def preprocess_dataset(tsv_file, split=None):
     """
     Preprocess the Dataset.
     1. Read all data frames,
@@ -235,15 +217,15 @@ def compute_metrics(p):
 
     # Remove ignored index (special tokens)
     true_predictions = [
-        [LABEL_NAMES[p] for (p, l) in zip(pred, label) if l != -100]
+        [NERConfig.LABEL_NAMES[p] for (p, l) in zip(pred, label) if l != -100]
         for pred, label in zip(predictions, labels)
     ]
     true_labels = [
-        [LABEL_NAMES[l] for (p, l) in zip(pred, label) if l != -100]
+        [NERConfig.LABEL_NAMES[l] for (p, l) in zip(pred, label) if l != -100]
         for pred, label in zip(predictions, labels)
     ]
 
-    results = METRIC.compute(
+    results = NERConfig.METRIC.compute(
         predictions=true_predictions, references=true_labels)
 
     flattened_results = {
@@ -262,8 +244,8 @@ def compute_metrics(p):
 def create_trainer(train_datset, val_dataset,
                    training_arguments):
     model = BertForTokenClassification.from_pretrained(
-        MODEL_NAME, num_labels=len(LABEL_NAMES))
-    data_collator = DataCollatorForTokenClassification(TOKENIZER)
+        NERConfig.MODEL_NAME, num_labels=len(NERConfig.LABEL_NAMES))
+    data_collator = NERConfig.DATA_COLLATOR
     args = TrainingArguments(
         output_dir=training_arguments.get('output_dir'),
         evaluation_strategy=training_arguments.get('evaluation_strategy'),
@@ -286,17 +268,25 @@ def create_trainer(train_datset, val_dataset,
         train_dataset=train_datset,
         eval_dataset=val_dataset,
         data_collator=data_collator,
-        tokenizer=TOKENIZER,
+        tokenizer=NERConfig.TOKENIZER,
         compute_metrics=compute_metrics
     )
     return trainer
 
 
-def train_model(train_tsv_file='./data/en-small_corpora_train.tsv',
-                test_tsv_file='./data/en-small_corpora_test.tsv',
-                model_output='./models/ner/m-bert_ner_en.model',
-                training_arguments=TRAIN_CONFIG,
-                ):
+def train_model(train_tsv_file, test_tsv_file,
+                model_name, training_arguments):
+    """Training ner model
+
+    Args:
+        train_tsv_file (str): Training tsv file
+        test_tsv_file (str, optional): Test tsv file
+        model_name (str, optional): Model name
+        training_arguments (dict): Training arguments
+
+    Returns:
+        dic: Test result
+    """
     train_dataset, val_dataset = preprocess_dataset(
         tsv_file=train_tsv_file, split=training_arguments.get(
             'train_val_split'))
@@ -309,8 +299,23 @@ def train_model(train_tsv_file='./data/en-small_corpora_train.tsv',
     trainer.train()
     result = trainer.evaluate(test_dataset)
     print("EVALUATE: ", result)
-    trainer.save_model(model_output)
+    trainer.save_model(NERConfig.MODEL_SAVE_PATH + model_name)
+    return result
 
 
 if __name__ == '__main__':
-    train_model()
+    train_file = './data/en-small_corpora_train.tsv'
+    test_file = './data/en-small_corpora_test.tsv'
+    model_name = 'en-small_corpora'
+    training_arguments = dict(
+        output_dir="./training_output/m-bert_my_ner_de_en_corpora_output",
+        evaluation_strategy="steps",
+        learning_rate=2e-5,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
+        num_train_epochs=6,
+        weight_decay=1e-3,
+        logging_steps=800,
+        train_val_split=0.2
+    )
+    train_model(train_file, test_file, model_name, training_arguments)
