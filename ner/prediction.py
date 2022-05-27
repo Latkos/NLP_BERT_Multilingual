@@ -4,7 +4,7 @@ from transformers import (
     pipeline
 )
 
-from ner_config import NERConfig
+from ner.ner_config import NERConfig
 
 
 def load_tokenizer(model_name):
