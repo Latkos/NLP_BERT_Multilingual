@@ -1,12 +1,7 @@
-from unittest import result
-import pandas as pd
-import numpy as np
-import torch
-
-from datasets import Dataset
 from transformers import (
     AutoTokenizer,
-    BertForTokenClassification
+    BertForTokenClassification,
+    pipeline
 )
 
 from ner_config import NERConfig
@@ -27,13 +22,13 @@ def load_tokenizer(model_name):
 
 
 def load_model(model_name):
-    """Load Mode from saved model file
+    """Load Model from saved model file
 
     Args:
         model_name (string): Model name
 
     Returns:
-        huggingface.TokenClassification: Token classification
+        huggingface.ForTokenClassification: Token classification
     """
     model_path = NERConfig.MODEL_SAVE_PATH + model_name
     model = BertForTokenClassification.from_pretrained(
@@ -41,100 +36,146 @@ def load_model(model_name):
     return model
 
 
-def convert_subwords_list(subwords_list):
-    words_list = list()
-    tmp = ''
-    for i in subwords_list:
-        if i.startswith('##'):
-            tmp += i.replace('##', '')
-        else:
-            if tmp == '':
-                tmp = i
-            else:
-                words_list.append(tmp)
-                tmp = i
-    words_list.append(tmp)
-    return words_list
+def get_entities_sentence(list_entity_groups):
+    """
+    Postprocessing for prediction result.
 
+    Args:
+        list_entity_groups (list): List of predicted group for words
+        e.g:
+            {
+                'entity_group': 'LABEL_0',
+                'score': 0.99553,
+                'word': 'developed by',
+                'start': 190,
+                'end': 202
+            },
+            {
+                'entity_group': 'LABEL_1',
+                'score': 0.7543062,
+                'word': 'TI',
+                'start': 203,
+                'end': 205
+            },
+            {
+                'entity_group': 'LABEL_0',
+                'score': 0.9995715,
+                'word': '.',
+                'start': 205,
+                'end': 206
+            }]
 
-def prediction(model_name, sentence):
-    tokenizer = load_tokenizer(model_name)
-    model = load_model(model_name)
-
-    tokens = tokenizer(sentence)
-    input_ids = tokens['input_ids']
-    predictions = model.forward(
-        input_ids=torch.tensor(input_ids).unsqueeze(0),
-        attention_mask=torch.tensor(tokens['attention_mask']).unsqueeze(0))
-    label_id = torch.argmax(predictions.logits.squeeze(), axis=1)
-    list_label_names = [NERConfig.LABEL_NAMES[i] for i in label_id]
-
-    if len(list_label_names) != len(input_ids):
-        raise Exception("Can not add tags <e1>, <e2> to sentence")
-
-    word_list = []
-    entity_1 = []
-    entity_2 = []
+    Returns:
+        dict:
+            'ENTITY_1': string coresponded with entity 1,
+            'ENTITY_2': string coresponded with entity 2,
+            'TEXT': input text with <e1>, </e1>, <e2>, </e2> tags set
+    """
+    words_list = []
+    entity_1_words = []
+    entity_2_words = []
     flag = 0
-    cls_id = tokenizer.cls_token_id
-    sep_id = tokenizer.sep_token_id
 
-    for indx, input_id in enumerate(input_ids):
-        if (input_id == cls_id) or (input_id == sep_id):
-            continue
-        if (list_label_names[indx] == "B-ENTITIY_1"):
+    for group in list_entity_groups:
+        if group.get('entity_group') == 'LABEL_1':
             if flag == 0:
-                word_list.append('<e1>')
-            word = tokenizer.convert_ids_to_tokens(input_id)
-            word_list.append(word)
-            entity_1.append(word)
+                words_list.append('<e1>')
+            word = group.get('word')
+            words_list.append(word)
+            entity_1_words.append(word)
             flag = 1
-        elif (list_label_names[indx] == "I-ENTITIY_1"):
-            word = tokenizer.convert_ids_to_tokens(input_id)
-            word_list.append(word)
-            entity_1.append(word)
-        elif (list_label_names[indx] == "B-ENTITIY_2"):
+        elif group.get('entity_group') == 'LABEL_2':
+            word = group.get('word')
+            words_list.append(word)
+            entity_1_words.append(word)
+        elif group.get('entity_group') == 'LABEL_3':
             if flag == 0:
-                word_list.append('<e2>')
-            word = tokenizer.convert_ids_to_tokens(input_id)
-            word_list.append(word)
-            entity_2.append(word)
+                words_list.append('<e2>')
+            word = group.get('word')
+            words_list.append(word)
+            entity_2_words.append(word)
             flag = 2
-        elif (list_label_names[indx] == "I-ENTITIY_2"):
-            word = tokenizer.convert_ids_to_tokens(input_id)
-            word_list.append(word)
-            entity_2.append(word)
-        elif (list_label_names[indx] == "O"):
+        elif group.get('entity_group') == 'LABEL_4':
+            word = group.get('word')
+            words_list.append(word)
+            entity_2_words.append(word)
+        elif group.get('entity_group') == 'LABEL_0':
+            word = group.get('word')
             if flag == 1:
-                word = tokenizer.convert_ids_to_tokens(input_id)
-                word_list.append('</e1>')
-                word_list.append(word)
+                words_list.append('</e1>')
                 flag = 0
             elif flag == 2:
-                word = tokenizer.convert_ids_to_tokens(input_id)
-                word_list.append('</e2>')
-                word_list.append(word)
+                words_list.append('</e2>')
                 flag = 0
-            else:
-                word = tokenizer.convert_ids_to_tokens(input_id)
-                word_list.append(word)
+            words_list.append(word)
 
-    new_word_list = convert_subwords_list(word_list)
-    new_entity_1 = convert_subwords_list(entity_1)
-    new_entity_2 = convert_subwords_list(entity_2)
-    sentence = ' '.join(new_word_list)
+    sentence = ' '.join(words_list)
+    entity_1 = ' '.join(entity_1_words)
+    entity_2 = ' '.join(entity_2_words)
+    return {
+        'ENTITY_1': entity_1,
+        'ENTITY_2': entity_2,
+        'TEXT': sentence
+    }
 
-    return new_entity_1, new_entity_2, sentence
+
+def prediction(model_name, sentences):
+    """
+    Prediction a entity 1 and entity 2 for sentence or list sentences 
+
+    Args:
+        model_name (string): Saved model name
+        sentences (list or string): text to predict entity 1 and entity 2
+
+    Returns:
+        list: list of dict for each sentence with entity_1, entity_2 and
+        input sentence with <e1>, </e1>, <e2>, </e2> tags set. 
+    """
+
+    tokenizer = load_tokenizer(model_name)
+    model = load_model(model_name)
+    result = []
+
+    token_classifier = pipeline(
+        "token-classification", model=model, tokenizer=tokenizer,
+        aggregation_strategy="simple"
+    )
+
+    groups = token_classifier(sentences)
+
+    if isinstance(groups[0], dict):
+        result.append(get_entities_sentence(groups))
+    else:
+        for i in groups:
+            result.append(get_entities_sentence(i))
+
+    return result
 
 
 if __name__ == '__main__':
+# EXAMPLES FROM en-small_corpa test
+
 # 21657	Cameron	Terminator	no_relation	<e1>Cameron</e1> first gained recognition for directing The <e2>Terminator</e2> (1984).	en    
 # 32831	Saskatoon Sanatorium	sanatorium	has-type	The <e1>Saskatoon Sanatorium</e1> was a tuberculosis <e2>sanatorium</e2> established in 1925 by the Saskatchewan Anti-Tuberculosis League as the second Sanatorium in the province in Wellington Park south or the Holiday Park neighborhood of Saskatoon, Saskatchewan, Canada.	en
 # 16057	Caspian tiger	270-295 cm	has-length	The <e1>Caspian tiger</e1> ranked among the largest cats that ever existed. Males had a body length of <e2>270-295 cm</e2> (106-116 in) and weighed 170-240 kg (370-530 lb); females measured 240-260 cm (94-102 in) in head-to-body and weighed 85-135 kg (187-298 lb).	en
 # 5169	Ashton, West Virginia	25503	post-code	Ashton has a post office with ZIP code <e2>25503</e2>. Geological Survey Geographic Names Information System: <e1>Ashton, West Virginia</e1> ZIP Code Lookup Archived June 14, 2011, at the Wayback Machine Kenny, Hamill (1945).	en
 # 10410	Kirrawee High School	Kirrawee, New South Wales, Australia	is-where	<e1>Kirrawee High School</e1> is a comprehensive co-educational high school located in <e2>Kirrawee, New South Wales, Australia</e2>, adjacent to the Royal National Park.	en
+# 458	Ambara	Sen Prakash	movie-has-director	<e1>Ambara</e1> (Kannada: ಅಂಬರ) is a 2013 Indian Kannada language romance film written and directed by <e2>Sen Prakash</e2>.	en
+
+# 744	Mani di fata	Steno	movie-has-director	<e1>Mani di fata</e1> (Fairy hands) is a 1983 Italian comedy film directed by <e2>Steno</e2>.	en
+# 13746	Female southern elephant seals	400 to 900 kg	has-weight	On average <e1>Female southern elephant seals</e1> weigh <e2>400 to 900 kg</e2> (880 to 1,980 lb).	en
+# 21023	Penumbra	Penumbra: Overture	no_relation	Built upon this engine they made <e1>Penumbra</e1>, a tech demo to display the engine's capabilities, which later evolved into their first game, <e2>Penumbra: Overture</e2>.	en
 
     model_name = 'en-small_corpora'
-    sentece = "Kirrawee High School is a comprehensive co-educational high school located in Kirrawee, New South Wales, Australia, adjacent to the Royal National Park."
-    ent_1, ent_2, new_sentence = prediction(model_name, sentece)
-    print(ent_1, ent_2, new_sentence)
+    # sentece = "Ambara (Kannada: ಅಂಬರ) is a 2013 Indian Kannada language romance film written and directed by Sen Prakash."
+    # result = prediction(model_name, sentece)
+    # print(result, "\n\n")
+    model_name = 'en-small_corpora'
+    senteces = [
+        "Mani di fata (Fairy hands) is a 1983 Italian comedy film directed by Steno.",
+        "On average Female southern elephant seals weigh 400 to 900 kg (880 to 1,980 lb).",
+        "Built upon this engine they made Penumbra, a tech demo to display the engine's capabilities, which later evolved into their first game, Penumbra: Overture."
+    ]
+
+    result = prediction(model_name, senteces)
+    print(result)
