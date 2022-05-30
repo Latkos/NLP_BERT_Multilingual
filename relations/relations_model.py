@@ -25,8 +25,6 @@ def train_model(df, model_name):
         per_device_eval_batch_size=64,  # batch size for evaluation
         warmup_steps=500,  # number of warmup steps for learning rate scheduler
         weight_decay=0.01,  # strength of weight decay
-        logging_dir="./logs",  # directory for storing logs
-        logging_steps=10,
         save_total_limit=1,
         save_strategy="no",
         load_best_model_at_end=False,
