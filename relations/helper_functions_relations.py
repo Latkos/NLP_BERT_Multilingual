@@ -11,6 +11,7 @@ def get_texts_and_labels(df):
     labels = [map[x] for x in labels]
     return texts, labels
 
+
 def prune_prefixes_from_labels(predictions):
     predicted_labels = []
     for prediction in predictions:
@@ -21,7 +22,6 @@ def prune_prefixes_from_labels(predictions):
     return predicted_labels
 
 
-
 def calculate_metrics(test_labels, predicted_test_labels):
     precision, recall, f1, _ = precision_recall_fscore_support(test_labels, predicted_test_labels, average="weighted")
     accuracy = accuracy_score(test_labels, predicted_test_labels)
@@ -30,4 +30,3 @@ def calculate_metrics(test_labels, predicted_test_labels):
     logger.info("F1 SCORE: %.2f", f1)
     logger.info("ACCURACY: %.2f", accuracy)
     return precision, recall, f1, accuracy
-

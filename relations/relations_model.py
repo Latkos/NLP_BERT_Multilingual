@@ -6,7 +6,7 @@ from logger import logger
 from relations_dataset import RelationsDataset
 
 
-def train_model(df, model_name):
+def train_model(df, model_name, training_arguments):
     logger.info("GETTING TEXTS AND LABELS")
     train_texts, train_labels = get_texts_and_labels(df)
     logger.info("SPLITTING")
@@ -18,17 +18,9 @@ def train_model(df, model_name):
     logger.info("CREATING DATASETS")
     train_dataset = RelationsDataset(train_encodings, train_labels)
     val_dataset = RelationsDataset(val_encodings, val_labels)
-    training_args = TrainingArguments(
-        output_dir="results",  # output directory
-        num_train_epochs=3,  # total number of training epochs
-        per_device_train_batch_size=16,  # batch size per device during training
-        per_device_eval_batch_size=64,  # batch size for evaluation
-        warmup_steps=500,  # number of warmup steps for learning rate scheduler
-        weight_decay=0.01,  # strength of weight decay
-        save_total_limit=1,
-        save_strategy="no",
-        load_best_model_at_end=False,
-    )
+
+    not_none_params = {k: v for k, v in training_arguments.items() if v is not None}
+    training_args = TrainingArguments(not_none_params)
     labels_number = len(set(train_labels))
     model = BertForSequenceClassification.from_pretrained("bert-base-multilingual-cased", num_labels=labels_number)
     trainer = Trainer(

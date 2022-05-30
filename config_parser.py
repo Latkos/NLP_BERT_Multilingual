@@ -8,4 +8,4 @@ def get_config(config_path):
 
 def get_ner_training_args(config_path):
     config = get_config(config_path)
-    return config['train']['ner']
+    return config["train"]["ner"]
