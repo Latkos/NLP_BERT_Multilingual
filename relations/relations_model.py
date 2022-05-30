@@ -20,7 +20,7 @@ def train_model(df, model_name, training_arguments):
     val_dataset = RelationsDataset(val_encodings, val_labels)
 
     not_none_params = {k: v for k, v in training_arguments.items() if v is not None}
-    training_args = TrainingArguments(not_none_params)
+    training_args = TrainingArguments(**not_none_params)
     labels_number = len(set(train_labels))
     model = BertForSequenceClassification.from_pretrained("bert-base-multilingual-cased", num_labels=labels_number)
     trainer = Trainer(
