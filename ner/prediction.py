@@ -143,3 +143,40 @@ def prediction(model_name, sentences):
             result.append(get_entities_sentence(i))
 
     return result
+
+def generate_predicted_csv(tsv_file, model_name):
+    import pandas as pd
+
+    def replace_tags(raw_text):
+
+        new_text = (
+            raw_text.replace("<e1>", "")
+            .replace("</e1>", "")
+            .replace("<e2>", "")
+            .replace("</e2>", "")
+        )
+        return new_text
+
+    df = pd.read_csv(tsv_file, sep="\t", header=0)
+    df["new_text"] = df.apply(lambda row: replace_tags(row.text), axis=1)
+    sentences = list(df["new_text"])
+    results = prediction(model_name, sentences)
+    my_ent1 = list()
+    my_ent2 = list()
+    my_tags_texts = list()
+    for res in results:
+        e1, e2, t = res.values()
+        my_ent1.append(e1)
+        my_ent2.append(e2)
+        my_tags_texts.append(t)
+
+    output_df = pd.DataFrame.from_dict(
+        {
+            "entity_1": my_ent1,
+            "entity_2": my_ent2,
+            "label": df["label"],
+            "text": my_tags_texts,
+            "lang": df["lang"],
+        }
+    )
+    output_df.to_csv('my_' + tsv_file, sep='\t')
