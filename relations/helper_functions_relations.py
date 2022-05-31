@@ -13,7 +13,6 @@ def get_texts_and_labels(df, model_path):
     map_path = f"{model_path}/map.json"
     inverted_map = {v: k for k, v in map.items()}
     os.makedirs(os.path.dirname(map_path), exist_ok=True)
-    print("PATH",os.path.dirname(map_path))
     with open(map_path, "w+") as f:
         json.dump(inverted_map, f)
     return texts, labels

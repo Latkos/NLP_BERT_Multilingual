@@ -163,9 +163,8 @@ def tokenize_adjust_labels(all_samples_per_split):
                 adjusted_label_ids.append(existing_label_ids[i])
                 prev_wid = wid
             else:
-                label_name = NERConfig.LABEL_NAMES[existing_label_ids[i]]
+                # label_name = NERConfig.LABEL_NAMES[existing_label_ids[i]]
                 adjusted_label_ids.append(existing_label_ids[i])
-
         total_adjusted_labels.append(adjusted_label_ids)
     tokenized_samples["labels"] = total_adjusted_labels
     return tokenized_samples
@@ -268,7 +267,7 @@ def train_model(
         test_tsv_file (str, optional): Test tsv file
         model_name (str, optional): Model name
         training_arguments (dict): Training arguments
-
+        split (float): Train/val split
     Returns:
         dic: Test result
     """
@@ -286,21 +285,3 @@ def train_model(
     print("EVALUATE: ", result)
     trainer.save_model(NERConfig.MODEL_SAVE_PATH + model_name)
     return result
-
-
-if __name__ == "__main__":
-    train_file = "../data/en-small_corpora_train.tsv"
-    test_file = "../data/en-small_corpora_test.tsv"
-    model_name = "en-small_corpora"
-    training_arguments = dict(
-        output_dir="./training_output/m-bert_my_ner_de_en_corpora_output",
-        evaluation_strategy="steps",
-        learning_rate=2e-5,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
-        num_train_epochs=6,
-        weight_decay=1e-3,
-        logging_steps=800,
-        train_val_split=0.2,
-    )
-    train_model(train_file, test_file, model_name, training_arguments)

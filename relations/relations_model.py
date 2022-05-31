@@ -17,11 +17,11 @@ from relations.relations_dataset import RelationsDataset
 import pandas as pd
 
 
-def re_train_model(train_file, model_path, training_arguments):
-    df = pd.read_csv(train_file, sep='\t')
+def re_train_model(train_file, model_path, training_arguments, split=0.2):
+    df = pd.read_csv(train_file, sep="\t")
     train_texts, train_labels = get_texts_and_labels(df, model_path)
     train_texts, val_texts, train_labels, val_labels = train_test_split(
-        train_texts, train_labels, test_size=0.2
+        train_texts, train_labels, test_size=split
     )
     tokenizer = AutoTokenizer.from_pretrained("bert-base-multilingual-cased")
     train_encodings = tokenizer(train_texts, truncation=True, padding=True)
@@ -46,7 +46,7 @@ def re_train_model(train_file, model_path, training_arguments):
 
 
 def re_evaluate_model(test_file, model_path):
-    df = pd.read_csv(test_file, sep='\t')
+    df = pd.read_csv(test_file, sep="\t")
     test_texts, test_labels = get_texts_and_labels(df, model_path)
     tokenizer = AutoTokenizer.from_pretrained("bert-base-multilingual-cased")
     labels_number = len(set(test_labels))
