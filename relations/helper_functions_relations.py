@@ -1,14 +1,21 @@
+import json
+import os
 from seqeval.metrics import accuracy_score
 from sklearn.metrics import precision_recall_fscore_support
+import pandas as pd
 
-from logger import logger
 
-
-def get_texts_and_labels(df):
+def get_texts_and_labels(df, model_path):
     texts = df["text"].tolist()
     labels = df["label"].tolist()
     map = dict([(y, x) for x, y in enumerate(sorted(set(labels)))])
     labels = [map[x] for x in labels]
+    map_path = f"{model_path}/map.json"
+    inverted_map = {v: k for k, v in map.items()}
+    os.makedirs(os.path.dirname(map_path), exist_ok=True)
+    print("PATH",os.path.dirname(map_path))
+    with open(map_path, "w+") as f:
+        json.dump(inverted_map, f)
     return texts, labels
 
 
@@ -22,11 +29,21 @@ def prune_prefixes_from_labels(predictions):
     return predicted_labels
 
 
+def map_result_to_text(result, model_path):
+    map_path = f"{model_path}/map.json"
+    with open(map_path, "r") as f:
+        map = json.loads(f.read())
+    result = [map[str(label)] for label in result]
+    return result
+
+
 def calculate_metrics(test_labels, predicted_test_labels):
-    precision, recall, f1, _ = precision_recall_fscore_support(test_labels, predicted_test_labels, average="weighted")
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        test_labels, predicted_test_labels, average="weighted"
+    )
     accuracy = accuracy_score(test_labels, predicted_test_labels)
-    logger.info("PRECISION: %.2f", precision)
-    logger.info("RECALL: %.2f", recall)
-    logger.info("F1 SCORE: %.2f", f1)
-    logger.info("ACCURACY: %.2f", accuracy)
+    print("PRECISION: %.2f", precision)
+    print("RECALL: %.2f", recall)
+    print("F1 SCORE: %.2f", f1)
+    print("ACCURACY: %.2f", accuracy)
     return precision, recall, f1, accuracy

@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, BertForTokenClassification, pipeline
 from ner.ner_config import NERConfig
 
 
-def load_tokenizer(model_name):
+def load_tokenizer(model_path):
     """Load tokenizer from saved model file
 
     Args:
@@ -12,12 +12,11 @@ def load_tokenizer(model_name):
     Returns:
         huggingface.Tokenizer: Tokenizer
     """
-    model_path = NERConfig.MODEL_SAVE_PATH + model_name
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     return tokenizer
 
 
-def load_model(model_name):
+def load_model(model_path):
     """Load Model from saved model file
 
     Args:
@@ -26,8 +25,9 @@ def load_model(model_name):
     Returns:
         huggingface.ForTokenClassification: Token classification
     """
-    model_path = NERConfig.MODEL_SAVE_PATH + model_name
-    model = BertForTokenClassification.from_pretrained(model_path, num_labels=len(NERConfig.LABEL_NAMES))
+    model = BertForTokenClassification.from_pretrained(
+        model_path, num_labels=len(NERConfig.LABEL_NAMES)
+    )
     return model
 
 
@@ -127,7 +127,12 @@ def prediction(model_name, sentences):
     model = load_model(model_name)
     result = []
 
-    token_classifier = pipeline("token-classification", model=model, tokenizer=tokenizer, aggregation_strategy="simple")
+    token_classifier = pipeline(
+        "token-classification",
+        model=model,
+        tokenizer=tokenizer,
+        aggregation_strategy="simple",
+    )
 
     groups = token_classifier(sentences)
 

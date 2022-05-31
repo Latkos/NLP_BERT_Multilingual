@@ -16,7 +16,13 @@ class Singleton(type):
 
 
 class NERConfig(metaclass=Singleton):
-    DICT_LABELS = {"O": 0, "B-ENTITIY_1": 1, "I-ENTITIY_1": 2, "B-ENTITIY_2": 3, "I-ENTITIY_2": 4}
+    DICT_LABELS = {
+        "O": 0,
+        "B-ENTITIY_1": 1,
+        "I-ENTITIY_1": 2,
+        "B-ENTITIY_2": 3,
+        "I-ENTITIY_2": 4,
+    }
     LABEL_NAMES = list(DICT_LABELS.keys())
     MODEL_NAME = "bert-base-multilingual-cased"
     TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)

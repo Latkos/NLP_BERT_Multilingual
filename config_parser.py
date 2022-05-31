@@ -6,6 +6,6 @@ def get_config(config_path):
         return yaml.safe_load(stream)
 
 
-def get_ner_training_args(config_path):
+def get_training_args(config_path, model_type):
     config = get_config(config_path)
-    return config["train"]["ner"]
+    return config["train"][model_type]

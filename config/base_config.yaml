@@ -1,11 +1,24 @@
 train:
   ner:
-    output_dir: "./training_output/m-bert_my_ner_de_en_corpora_output"
+    output_dir: "big-ner"
     evaluation_strategy: "steps"
     per_device_train_batch_size: 16
     per_device_eval_batch_size: 16
     num_train_epochs: 3
-    logging_steps: 800
-    train_val_split: 0.2
-    weight_decay: 0.001
-    learning_rate: 0.00002
+    logging_steps: 20000
+    weight_decay: 0.01
+    load_best_model_at_end: True
+    save_total_limit: 1
+    warmup_steps: 500
+    save_steps: 20000
+
+  re:
+    output_dir: "results"
+    per_device_train_batch_size: 16
+    per_device_eval_batch_size: 64
+    num_train_epochs: 3
+    weight_decay: 0.01
+    save_total_limit: 1
+    warmup_steps: 500
+    save_strategy: "no"
+    load_best_model_at_end: False

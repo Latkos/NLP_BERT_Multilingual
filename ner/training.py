@@ -11,7 +11,6 @@ from transformers import (
 
 from ner.ner_config import NERConfig
 
-
 nltk.download("punkt")
 
 
@@ -110,7 +109,9 @@ def add_tokens_ner_tags(data_frame):
         pandas.DataFrame: Data frame with extra column 'tokens' and 'ner_tags'
     """
     data_frame["tokens"] = data_frame.apply(lambda row: create_tokens(row.text), axis=1)
-    data_frame["ner_tags"] = data_frame.apply(lambda row: create_ner_tags(row.text), axis=1)
+    data_frame["ner_tags"] = data_frame.apply(
+        lambda row: create_ner_tags(row.text), axis=1
+    )
     return data_frame
 
 
@@ -139,7 +140,9 @@ def tokenize_adjust_labels(all_samples_per_split):
     Returns:
         Dataset: Dataset with tokenized samples.
     """
-    tokenized_samples = NERConfig.TOKENIZER.batch_encode_plus(all_samples_per_split["tokens"], is_split_into_words=True)
+    tokenized_samples = NERConfig.TOKENIZER.batch_encode_plus(
+        all_samples_per_split["tokens"], is_split_into_words=True
+    )
     # tokenized_samples is not a datasets object so
     # this alone won't work with Trainer API, hence map is used
     # so the new keys [input_ids, labels (after adjustment)]
@@ -219,7 +222,9 @@ def compute_metrics(p):
         for pred, label in zip(predictions, labels)
     ]
 
-    results = NERConfig.METRIC.compute(predictions=true_predictions, references=true_labels)
+    results = NERConfig.METRIC.compute(
+        predictions=true_predictions, references=true_labels
+    )
 
     flattened_results = {
         "overall_precision": results["overall_precision"],
@@ -235,21 +240,12 @@ def compute_metrics(p):
 
 
 def create_trainer(train_datset, val_dataset, training_arguments):
-    model = BertForTokenClassification.from_pretrained(NERConfig.MODEL_NAME, num_labels=len(NERConfig.LABEL_NAMES))
-    data_collator = NERConfig.DATA_COLLATOR
-    args = TrainingArguments(
-        output_dir=training_arguments.get("output_dir"),
-        evaluation_strategy=training_arguments.get("evaluation_strategy"),
-        learning_rate=training_arguments.get("learning_rate"),
-        per_device_train_batch_size=training_arguments.get("per_device_train_batch_size"),
-        per_device_eval_batch_size=training_arguments.get("per_device_eval_batch_size"),
-        num_train_epochs=training_arguments.get("num_train_epochs"),
-        weight_decay=training_arguments.get("weight_decay"),
-        logging_steps=training_arguments.get("logging_steps"),
-        save_total_limit=1,
-        load_best_model_at_end=True,
+    model = BertForTokenClassification.from_pretrained(
+        NERConfig.MODEL_NAME, num_labels=len(NERConfig.LABEL_NAMES)
     )
-
+    data_collator = NERConfig.DATA_COLLATOR
+    not_none_params = {k: v for k, v in training_arguments.items() if v is not None}
+    args = TrainingArguments(**not_none_params)
     trainer = Trainer(
         model,
         args,
@@ -262,7 +258,9 @@ def create_trainer(train_datset, val_dataset, training_arguments):
     return trainer
 
 
-def train_model(train_tsv_file, test_tsv_file, model_name, training_arguments):
+def train_model(
+    train_tsv_file, test_tsv_file, model_name, training_arguments, split=0.2
+):
     """Training ner model
 
     Args:
@@ -275,10 +273,14 @@ def train_model(train_tsv_file, test_tsv_file, model_name, training_arguments):
         dic: Test result
     """
     train_dataset, val_dataset = preprocess_dataset(
-        tsv_file=train_tsv_file, split=training_arguments.get("train_val_split")
+        tsv_file=train_tsv_file, split=split
     )
     test_dataset = preprocess_dataset(tsv_file=test_tsv_file)
-    trainer = create_trainer(train_datset=train_dataset, val_dataset=val_dataset, training_arguments=training_arguments)
+    trainer = create_trainer(
+        train_datset=train_dataset,
+        val_dataset=val_dataset,
+        training_arguments=training_arguments,
+    )
     trainer.train()
     result = trainer.evaluate(test_dataset)
     print("EVALUATE: ", result)
