@@ -19,10 +19,10 @@ Example:
 
 - python main_in_works.py train ./data/en-small_corpora_train.tsv \
 ./data/en-small_corpora_test.tsv --config ./config/base_config.yaml \
---model_name en-small_corpora
+--model_path_ner en-small_corpora
 
 - python main_in_works.py predict "Kyrgyz International Airlines was an airline based in Kyrgyzstan." \
---model_name en-small_corpora
+--model_path_ner en-small_corpora
 """
     pass
 
@@ -58,7 +58,7 @@ def train(train_file, test_file, config, model_path_ner, model_path_re, split):
 
 @bert_cli.command(
     help="""Predict entity_1, entity_2 and relation between entities with \
-pretrained M-BERT model for inputed text""",
+pretrained M-BERT model for inputted text""",
     short_help="Predict entity_1, entity_2, relation",
 )
 @click.argument("text", nargs=1, required=True, type=str)
@@ -66,7 +66,6 @@ pretrained M-BERT model for inputed text""",
     "--model_path_ner", nargs=1, default=None, type=str, help="model path NER"
 )
 @click.option("--model_path_re", nargs=1, default=None, type=str, help="model path RE")
-@click.option("--split", nargs=1, default=0.2, type=float, help="Train/val split")
 def predict(text, model_path_ner, model_path_re):
     final_prediction = pd.DataFrame()
     if type(text) != list:
