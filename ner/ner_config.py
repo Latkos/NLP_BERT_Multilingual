@@ -28,4 +28,3 @@ class NERConfig(metaclass=Singleton):
     TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
     METRIC = load_metric("seqeval")
     DATA_COLLATOR = DataCollatorForTokenClassification(TOKENIZER)
-    MODEL_SAVE_PATH = "./models/ner/"

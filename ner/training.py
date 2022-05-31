@@ -283,5 +283,5 @@ def train_model(
     trainer.train()
     result = trainer.evaluate(test_dataset)
     print("EVALUATE: ", result)
-    trainer.save_model(NERConfig.MODEL_SAVE_PATH + model_name)
+    trainer.save_model(model_name)
     return result
