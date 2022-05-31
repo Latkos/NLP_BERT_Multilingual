@@ -11,8 +11,7 @@ from transformers import (
 
 from ner.ner_config import NERConfig
 
-
-nltk.download('punkt')
+nltk.download("punkt")
 
 
 def read_tsv_file(tsv_file):
@@ -26,7 +25,7 @@ def read_tsv_file(tsv_file):
         pandas.DataFrame: Shuffled Data frame
     """
 
-    df = pd.read_csv(tsv_file, sep='\t', header=0)
+    df = pd.read_csv(tsv_file, sep="\t", header=0)
     df_ranodmize_rows = df.sample(frac=1)
     return df_ranodmize_rows
 
@@ -43,12 +42,13 @@ def create_tokens(raw_text):
         list: list of tokens
     """
 
-    new_text = raw_text.replace(
-        '<e1>', ' ').replace(
-            '</e1>', ' ').replace(
-                '<e2>', ' ').replace(
-                    '</e2>', ' ').replace(
-                        '.', ' . ')
+    new_text = (
+        raw_text.replace("<e1>", " ")
+        .replace("</e1>", " ")
+        .replace("<e2>", " ")
+        .replace("</e2>", " ")
+        .replace(".", " . ")
+    )
     tokens = nltk.word_tokenize(new_text)
     return tokens
 
@@ -63,42 +63,38 @@ def create_ner_tags(raw_text):
         list: list of ner tags
     """
     ner_tags_list = []
-    new_text = raw_text.replace(
-        '.', ' . ').replace(
-            '<e1>', ' StartEnity1 ').replace(
-                '</e1>', ' StopEnity1 ').replace(
-                    '<e2>', ' StartEnity2 ').replace(
-                        '</e2>', ' StopEnity2 ')
+    new_text = (
+        raw_text.replace(".", " . ")
+        .replace("<e1>", " StartEnity1 ")
+        .replace("</e1>", " StopEnity1 ")
+        .replace("<e2>", " StartEnity2 ")
+        .replace("</e2>", " StopEnity2 ")
+    )
 
     text_tokens = nltk.word_tokenize(new_text)
     flag = 0
     for token in text_tokens:
-        if token in ['StartEnity1', 'StopEnity1', 'StartEnity2', 'StopEnity2']:
-            if token == 'StartEnity1':
+        if token in ["StartEnity1", "StopEnity1", "StartEnity2", "StopEnity2"]:
+            if token == "StartEnity1":
                 flag = 1
-            elif token == 'StopEnity1':
+            elif token == "StopEnity1":
                 flag = 0
-            elif token == 'StartEnity2':
+            elif token == "StartEnity2":
                 flag = 3
-            elif token == 'StopEnity2':
+            elif token == "StopEnity2":
                 flag = 0
         elif flag == 0:
-            ner_tags_list.append(
-                NERConfig.DICT_LABELS.get('O'))
+            ner_tags_list.append(NERConfig.DICT_LABELS.get("O"))
         elif flag == 1:
-            ner_tags_list.append(
-                NERConfig.DICT_LABELS.get("B-ENTITIY_1"))
+            ner_tags_list.append(NERConfig.DICT_LABELS.get("B-ENTITIY_1"))
             flag = 2
         elif flag == 2:
-            ner_tags_list.append(
-                NERConfig.DICT_LABELS.get("I-ENTITIY_1"))
+            ner_tags_list.append(NERConfig.DICT_LABELS.get("I-ENTITIY_1"))
         elif flag == 3:
-            ner_tags_list.append(
-                NERConfig.DICT_LABELS.get("B-ENTITIY_2"))
+            ner_tags_list.append(NERConfig.DICT_LABELS.get("B-ENTITIY_2"))
             flag = 4
         elif flag == 4:
-            ner_tags_list.append(
-                NERConfig.DICT_LABELS.get("I-ENTITIY_2"))
+            ner_tags_list.append(NERConfig.DICT_LABELS.get("I-ENTITIY_2"))
 
     return ner_tags_list
 
@@ -112,10 +108,10 @@ def add_tokens_ner_tags(data_frame):
     Returns:
         pandas.DataFrame: Data frame with extra column 'tokens' and 'ner_tags'
     """
-    data_frame['tokens'] = data_frame.apply(
-        lambda row: create_tokens(row.text), axis=1)
-    data_frame['ner_tags'] = data_frame.apply(
-        lambda row: create_ner_tags(row.text), axis=1)
+    data_frame["tokens"] = data_frame.apply(lambda row: create_tokens(row.text), axis=1)
+    data_frame["ner_tags"] = data_frame.apply(
+        lambda row: create_ner_tags(row.text), axis=1
+    )
     return data_frame
 
 
@@ -129,7 +125,7 @@ def create_dataset(data_frame):
         Dataset: Dataset object
     """
 
-    new_data_frame = data_frame[['tokens', 'ner_tags']]
+    new_data_frame = data_frame[["tokens", "ner_tags"]]
     return Dataset.from_pandas(new_data_frame)
 
 
@@ -145,7 +141,8 @@ def tokenize_adjust_labels(all_samples_per_split):
         Dataset: Dataset with tokenized samples.
     """
     tokenized_samples = NERConfig.TOKENIZER.batch_encode_plus(
-        all_samples_per_split["tokens"], is_split_into_words=True)
+        all_samples_per_split["tokens"], is_split_into_words=True
+    )
     # tokenized_samples is not a datasets object so
     # this alone won't work with Trainer API, hence map is used
     # so the new keys [input_ids, labels (after adjustment)]
@@ -159,16 +156,15 @@ def tokenize_adjust_labels(all_samples_per_split):
         adjusted_label_ids = []
 
         for wid in word_ids_list:
-            if (wid is None):
+            if wid is None:
                 adjusted_label_ids.append(-100)
-            elif (wid != prev_wid):
+            elif wid != prev_wid:
                 i = i + 1
                 adjusted_label_ids.append(existing_label_ids[i])
                 prev_wid = wid
             else:
-                label_name = NERConfig.LABEL_NAMES[existing_label_ids[i]]
+                # label_name = NERConfig.LABEL_NAMES[existing_label_ids[i]]
                 adjusted_label_ids.append(existing_label_ids[i])
-
         total_adjusted_labels.append(adjusted_label_ids)
     tokenized_samples["labels"] = total_adjusted_labels
     return tokenized_samples
@@ -181,7 +177,7 @@ def preprocess_dataset(tsv_file, split=None):
     2. Add tokens and ner tags
     3. Convert to dataset
     4. Tokenize and adjust labels
-    5. Split dataset for training and validation if split is not none. 
+    5. Split dataset for training and validation if split is not none.
     5. return dataset used for training or test model
 
     Args:
@@ -198,8 +194,8 @@ def preprocess_dataset(tsv_file, split=None):
         return d2
     else:
         d3 = d2.train_test_split(split)
-        train = d3['train']
-        val = d3['test']
+        train = d3["train"]
+        val = d3["test"]
         return train, val
 
 
@@ -226,7 +222,8 @@ def compute_metrics(p):
     ]
 
     results = NERConfig.METRIC.compute(
-        predictions=true_predictions, references=true_labels)
+        predictions=true_predictions, references=true_labels
+    )
 
     flattened_results = {
         "overall_precision": results["overall_precision"],
@@ -235,33 +232,19 @@ def compute_metrics(p):
         "overall_accuracy": results["overall_accuracy"],
     }
     for k in results.keys():
-        if (k not in flattened_results.keys()):
+        if k not in flattened_results.keys():
             flattened_results[k + "_f1"] = results[k]["f1"]
 
     return flattened_results
 
 
-def create_trainer(train_datset, val_dataset,
-                   training_arguments):
+def create_trainer(train_datset, val_dataset, training_arguments):
     model = BertForTokenClassification.from_pretrained(
-        NERConfig.MODEL_NAME, num_labels=len(NERConfig.LABEL_NAMES))
-    data_collator = NERConfig.DATA_COLLATOR
-    args = TrainingArguments(
-        output_dir=training_arguments.get('output_dir'),
-        evaluation_strategy=training_arguments.get('evaluation_strategy'),
-        learning_rate=training_arguments.get('learning_rate'),
-        per_device_train_batch_size=training_arguments.get(
-            'per_device_train_batch_size'),
-        per_device_eval_batch_size=training_arguments.get(
-            'per_device_eval_batch_size'),
-        num_train_epochs=training_arguments.get(
-            'num_train_epochs'),
-        weight_decay=training_arguments.get(
-            'weight_decay'),
-        logging_steps=training_arguments.get(
-            'logging_steps'),
+        NERConfig.MODEL_NAME, num_labels=len(NERConfig.LABEL_NAMES)
     )
-
+    data_collator = NERConfig.DATA_COLLATOR
+    not_none_params = {k: v for k, v in training_arguments.items() if v is not None}
+    args = TrainingArguments(**not_none_params)
     trainer = Trainer(
         model,
         args,
@@ -269,13 +252,14 @@ def create_trainer(train_datset, val_dataset,
         eval_dataset=val_dataset,
         data_collator=data_collator,
         tokenizer=NERConfig.TOKENIZER,
-        compute_metrics=compute_metrics
+        compute_metrics=compute_metrics,
     )
     return trainer
 
 
-def train_model(train_tsv_file, test_tsv_file,
-                model_name, training_arguments):
+def train_model(
+    train_tsv_file, test_tsv_file, model_name, training_arguments, split=0.2
+):
     """Training ner model
 
     Args:
@@ -283,39 +267,21 @@ def train_model(train_tsv_file, test_tsv_file,
         test_tsv_file (str, optional): Test tsv file
         model_name (str, optional): Model name
         training_arguments (dict): Training arguments
-
+        split (float): Train/val split
     Returns:
         dic: Test result
     """
     train_dataset, val_dataset = preprocess_dataset(
-        tsv_file=train_tsv_file, split=training_arguments.get(
-            'train_val_split'))
+        tsv_file=train_tsv_file, split=split
+    )
     test_dataset = preprocess_dataset(tsv_file=test_tsv_file)
     trainer = create_trainer(
         train_datset=train_dataset,
         val_dataset=val_dataset,
-        training_arguments=training_arguments
+        training_arguments=training_arguments,
     )
     trainer.train()
     result = trainer.evaluate(test_dataset)
     print("EVALUATE: ", result)
     trainer.save_model(NERConfig.MODEL_SAVE_PATH + model_name)
     return result
-
-
-if __name__ == '__main__':
-    train_file = './data/en-small_corpora_train.tsv'
-    test_file = './data/en-small_corpora_test.tsv'
-    model_name = 'en-small_corpora'
-    training_arguments = dict(
-        output_dir="./training_output/m-bert_my_ner_de_en_corpora_output",
-        evaluation_strategy="steps",
-        learning_rate=2e-5,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
-        num_train_epochs=6,
-        weight_decay=1e-3,
-        logging_steps=800,
-        train_val_split=0.2
-    )
-    train_model(train_file, test_file, model_name, training_arguments)
